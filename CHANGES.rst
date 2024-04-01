@@ -5,6 +5,18 @@ Changelog (Pillow)
 10.3.0 (unreleased)
 -------------------
 
+- Add --report argument to __main__.py to omit supported formats #7818
+  [nulano, radarhere, hugovk]
+
+- Added RGB to I;16, I;16L, I;16B and I;16N conversion #7918, #7920
+  [radarhere]
+
+- Fix editable installation with custom build backend and configuration options #7658
+  [nulano, radarhere]
+
+- Fix putdata() for I;16N on big-endian #7209
+  [Yay295, hugovk, radarhere]
+
 - Determine MPO size from markers, not EXIF data #7884
   [radarhere]
 
@@ -4325,7 +4337,7 @@ Changelog (Pillow)
 - Documentation changes, URL update, transpose, release checklist
   [radarhere]
 
-- Fixed saving to nonexistant files specified by pathlib.Path objects #1748 (fixes #1747)
+- Fixed saving to nonexistent files specified by pathlib.Path objects #1748 (fixes #1747)
   [radarhere]
 
 - Round Image.crop arguments to the nearest integer #1745 (fixes #1744)
@@ -7536,7 +7548,7 @@ The test suite includes 400 individual tests.
 - A handbook is available (distributed separately).
 
 - The coordinate system is changed so that (0,0) is now located
-  in the upper left corner.  This is in compliancy with ISO 12087
+  in the upper left corner.  This is in compliance with ISO 12087
   and 90% of all other image processing and graphics libraries.
 
 - Modes "1" (bilevel) and "P" (palette) have been introduced.  Note
