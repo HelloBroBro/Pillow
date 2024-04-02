@@ -526,9 +526,9 @@ def test_profile_typesafety() -> None:
 def test_transform_typesafety() -> None:
     # core transform should not be directly instantiable
     with pytest.raises(TypeError):
-        ImageCms.core.CmsProfile()
+        ImageCms.core.CmsTransform()
     with pytest.raises(TypeError):
-        ImageCms.core.CmsProfile(0)
+        ImageCms.core.CmsTransform(0)
 
 
 def assert_aux_channel_preserved(
@@ -659,6 +659,11 @@ def test_auxiliary_channels_isolated() -> None:
                 )
 
                 assert_image_equal(test_image.convert(dst_format[2]), reference_image)
+
+
+def test_long_modes() -> None:
+    p = ImageCms.getOpenProfile("Tests/icc/sGrey-v2-nano.icc")
+    ImageCms.buildTransform(p, p, "ABCDEFGHI", "ABCDEFGHI")
 
 
 @pytest.mark.parametrize("mode", ("RGB", "RGBA", "RGBX"))
