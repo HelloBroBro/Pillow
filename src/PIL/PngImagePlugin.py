@@ -1114,8 +1114,8 @@ class _fdat:
         self.seq_num += 1
 
 
-def _write_multiple_frames(im, fp, chunk, rawmode, default_image, append_images):
-    duration = im.encoderinfo.get("duration", im.info.get("duration", 0))
+def _write_multiple_frames(im, fp, chunk, mode, rawmode, default_image, append_images):
+    duration = im.encoderinfo.get("duration")
     loop = im.encoderinfo.get("loop", im.info.get("loop", 0))
     disposal = im.encoderinfo.get("disposal", im.info.get("disposal", Disposal.OP_NONE))
     blend = im.encoderinfo.get("blend", im.info.get("blend", Blend.OP_SOURCE))
@@ -1129,13 +1129,15 @@ def _write_multiple_frames(im, fp, chunk, rawmode, default_image, append_images)
     frame_count = 0
     for im_seq in chain:
         for im_frame in ImageSequence.Iterator(im_seq):
-            if im_frame.mode == rawmode:
+            if im_frame.mode == mode:
                 im_frame = im_frame.copy()
             else:
-                im_frame = im_frame.convert(rawmode)
+                im_frame = im_frame.convert(mode)
             encoderinfo = im.encoderinfo.copy()
             if isinstance(duration, (list, tuple)):
                 encoderinfo["duration"] = duration[frame_count]
+            elif duration is None and "duration" in im_frame.info:
+                encoderinfo["duration"] = im_frame.info["duration"]
             if isinstance(disposal, (list, tuple)):
                 encoderinfo["disposal"] = disposal[frame_count]
             if isinstance(blend, (list, tuple)):
@@ -1170,15 +1172,12 @@ def _write_multiple_frames(im, fp, chunk, rawmode, default_image, append_images)
                     not bbox
                     and prev_disposal == encoderinfo.get("disposal")
                     and prev_blend == encoderinfo.get("blend")
+                    and "duration" in encoderinfo
                 ):
-                    previous["encoderinfo"]["duration"] += encoderinfo.get(
-                        "duration", duration
-                    )
+                    previous["encoderinfo"]["duration"] += encoderinfo["duration"]
                     continue
             else:
                 bbox = None
-            if "duration" not in encoderinfo:
-                encoderinfo["duration"] = duration
             im_frames.append({"im": im_frame, "bbox": bbox, "encoderinfo": encoderinfo})
 
     if len(im_frames) == 1 and not default_image:
@@ -1194,8 +1193,8 @@ def _write_multiple_frames(im, fp, chunk, rawmode, default_image, append_images)
 
     # default image IDAT (if it exists)
     if default_image:
-        if im.mode != rawmode:
-            im = im.convert(rawmode)
+        if im.mode != mode:
+            im = im.convert(mode)
         ImageFile._save(im, _idat(fp, chunk), [("zip", (0, 0) + im.size, 0, rawmode)])
 
     seq_num = 0
@@ -1208,7 +1207,7 @@ def _write_multiple_frames(im, fp, chunk, rawmode, default_image, append_images)
             im_frame = im_frame.crop(bbox)
         size = im_frame.size
         encoderinfo = frame_data["encoderinfo"]
-        frame_duration = int(round(encoderinfo["duration"]))
+        frame_duration = int(round(encoderinfo.get("duration", 0)))
         frame_disposal = encoderinfo.get("disposal", disposal)
         frame_blend = encoderinfo.get("blend", blend)
         # frame control
@@ -1272,6 +1271,7 @@ def _save(im, fp, filename, chunk=putchunk, save_all=False):
         size = im.size
         mode = im.mode
 
+    outmode = mode
     if mode == "P":
         #
         # attempt to minimize storage requirements for palette images
@@ -1292,7 +1292,7 @@ def _save(im, fp, filename, chunk=putchunk, save_all=False):
                 bits = 2
             else:
                 bits = 4
-            mode = f"{mode};{bits}"
+            outmode += f";{bits}"
 
     # encoder options
     im.encoderconfig = (
@@ -1304,7 +1304,7 @@ def _save(im, fp, filename, chunk=putchunk, save_all=False):
 
     # get the corresponding PNG mode
     try:
-        rawmode, bit_depth, color_type = _OUTMODES[mode]
+        rawmode, bit_depth, color_type = _OUTMODES[outmode]
     except KeyError as e:
         msg = f"cannot write mode {mode} as PNG"
         raise OSError(msg) from e
@@ -1425,7 +1425,7 @@ def _save(im, fp, filename, chunk=putchunk, save_all=False):
 
     if save_all:
         im = _write_multiple_frames(
-            im, fp, chunk, rawmode, default_image, append_images
+            im, fp, chunk, mode, rawmode, default_image, append_images
         )
     if im:
         ImageFile._save(im, _idat(fp, chunk), [("zip", (0, 0) + im.size, 0, rawmode)])

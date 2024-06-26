@@ -201,12 +201,12 @@ OPEN_INFO = {
     (MM, 2, (1,), 2, (8, 8, 8), ()): ("RGB", "RGB;R"),
     (II, 2, (1,), 1, (8, 8, 8, 8), ()): ("RGBA", "RGBA"),  # missing ExtraSamples
     (MM, 2, (1,), 1, (8, 8, 8, 8), ()): ("RGBA", "RGBA"),  # missing ExtraSamples
-    (II, 2, (1,), 1, (8, 8, 8, 8), (0,)): ("RGBX", "RGBX"),
-    (MM, 2, (1,), 1, (8, 8, 8, 8), (0,)): ("RGBX", "RGBX"),
-    (II, 2, (1,), 1, (8, 8, 8, 8, 8), (0, 0)): ("RGBX", "RGBXX"),
-    (MM, 2, (1,), 1, (8, 8, 8, 8, 8), (0, 0)): ("RGBX", "RGBXX"),
-    (II, 2, (1,), 1, (8, 8, 8, 8, 8, 8), (0, 0, 0)): ("RGBX", "RGBXXX"),
-    (MM, 2, (1,), 1, (8, 8, 8, 8, 8, 8), (0, 0, 0)): ("RGBX", "RGBXXX"),
+    (II, 2, (1,), 1, (8, 8, 8, 8), (0,)): ("RGB", "RGBX"),
+    (MM, 2, (1,), 1, (8, 8, 8, 8), (0,)): ("RGB", "RGBX"),
+    (II, 2, (1,), 1, (8, 8, 8, 8, 8), (0, 0)): ("RGB", "RGBXX"),
+    (MM, 2, (1,), 1, (8, 8, 8, 8, 8), (0, 0)): ("RGB", "RGBXX"),
+    (II, 2, (1,), 1, (8, 8, 8, 8, 8, 8), (0, 0, 0)): ("RGB", "RGBXXX"),
+    (MM, 2, (1,), 1, (8, 8, 8, 8, 8, 8), (0, 0, 0)): ("RGB", "RGBXXX"),
     (II, 2, (1,), 1, (8, 8, 8, 8), (1,)): ("RGBA", "RGBa"),
     (MM, 2, (1,), 1, (8, 8, 8, 8), (1,)): ("RGBA", "RGBa"),
     (II, 2, (1,), 1, (8, 8, 8, 8, 8), (1, 0)): ("RGBA", "RGBaX"),
@@ -225,8 +225,8 @@ OPEN_INFO = {
     (MM, 2, (1,), 1, (16, 16, 16), ()): ("RGB", "RGB;16B"),
     (II, 2, (1,), 1, (16, 16, 16, 16), ()): ("RGBA", "RGBA;16L"),
     (MM, 2, (1,), 1, (16, 16, 16, 16), ()): ("RGBA", "RGBA;16B"),
-    (II, 2, (1,), 1, (16, 16, 16, 16), (0,)): ("RGBX", "RGBX;16L"),
-    (MM, 2, (1,), 1, (16, 16, 16, 16), (0,)): ("RGBX", "RGBX;16B"),
+    (II, 2, (1,), 1, (16, 16, 16, 16), (0,)): ("RGB", "RGBX;16L"),
+    (MM, 2, (1,), 1, (16, 16, 16, 16), (0,)): ("RGB", "RGBX;16B"),
     (II, 2, (1,), 1, (16, 16, 16, 16), (1,)): ("RGBA", "RGBa;16L"),
     (MM, 2, (1,), 1, (16, 16, 16, 16), (1,)): ("RGBA", "RGBa;16B"),
     (II, 2, (1,), 1, (16, 16, 16, 16), (2,)): ("RGBA", "RGBA;16L"),
@@ -1658,6 +1658,16 @@ def _save(im, fp, filename):
         except Exception:
             pass  # might not be an IFD. Might not have populated type
 
+    legacy_ifd = {}
+    if hasattr(im, "tag"):
+        legacy_ifd = im.tag.to_v2()
+
+    supplied_tags = {**legacy_ifd, **getattr(im, "tag_v2", {})}
+    if SAMPLEFORMAT in supplied_tags:
+        # SAMPLEFORMAT is determined by the image format and should not be copied
+        # from legacy_ifd.
+        del supplied_tags[SAMPLEFORMAT]
+
     # additions written by Greg Couch, gregc@cgl.ucsf.edu
     # inspired by image-sig posting from Kevin Cazabon, kcazabon@home.com
     if hasattr(im, "tag_v2"):
@@ -1671,8 +1681,14 @@ def _save(im, fp, filename):
             XMP,
         ):
             if key in im.tag_v2:
-                ifd[key] = im.tag_v2[key]
-                ifd.tagtype[key] = im.tag_v2.tagtype[key]
+                if key == IPTC_NAA_CHUNK and im.tag_v2.tagtype[key] not in (
+                    TiffTags.BYTE,
+                    TiffTags.UNDEFINED,
+                ):
+                    del supplied_tags[key]
+                else:
+                    ifd[key] = im.tag_v2[key]
+                    ifd.tagtype[key] = im.tag_v2.tagtype[key]
 
     # preserve ICC profile (should also work when saving other formats
     # which support profiles as TIFF) -- 2008-06-06 Florian Hoech
@@ -1812,16 +1828,6 @@ def _save(im, fp, filename):
         # Merge the ones that we have with (optional) more bits from
         # the original file, e.g x,y resolution so that we can
         # save(load('')) == original file.
-        legacy_ifd = {}
-        if hasattr(im, "tag"):
-            legacy_ifd = im.tag.to_v2()
-
-        # SAMPLEFORMAT is determined by the image format and should not be copied
-        # from legacy_ifd.
-        supplied_tags = {**getattr(im, "tag_v2", {}), **legacy_ifd}
-        if SAMPLEFORMAT in supplied_tags:
-            del supplied_tags[SAMPLEFORMAT]
-
         for tag, value in itertools.chain(ifd.items(), supplied_tags.items()):
             # Libtiff can only process certain core items without adding
             # them to the custom dictionary.
