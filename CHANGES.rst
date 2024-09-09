@@ -5,6 +5,12 @@ Changelog (Pillow)
 11.0.0 (unreleased)
 -------------------
 
+- Deprecate support for FreeType 2.9.0 #8356
+  [hugovk, radarhere]
+
+- Removed unused TiffImagePlugin IFD_LEGACY_API #8355
+  [radarhere]
+
 - Handle duplicate EXIF header #8350
   [zakajd, radarhere]
 
