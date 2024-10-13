@@ -5,6 +5,18 @@ Changelog (Pillow)
 11.0.0 (unreleased)
 -------------------
 
+- Update licence to MIT-CMU #8460
+  [hugovk]
+
+- Conditionally define ImageCms type hint to avoid requiring core #8197
+  [radarhere]
+
+- Support writing LONG8 offsets in AppendingTiffWriter #8417
+  [radarhere]
+
+- Use ImageFile.MAXBLOCK when saving TIFF images #8461
+  [radarhere]
+
 - Do not close provided file handles with libtiff when saving #8458
   [radarhere]
 
